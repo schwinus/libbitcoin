@@ -58,10 +58,10 @@ const int64_t script_number_offsets[] =
     0x10000
 };
 
-BC_CONSTEXPR size_t script_number_values_count =
+constexpr size_t script_number_values_count =
 sizeof(script_number_values) / sizeof(script_number_values[0]);
 
-BC_CONSTEXPR size_t script_number_offsets_count =
+constexpr size_t script_number_offsets_count =
 sizeof(script_number_offsets) / sizeof(script_number_offsets[0]);
 
 struct script_number_buffer

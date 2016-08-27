@@ -26,57 +26,31 @@ namespace libbitcoin {
 
 namespace bc = libbitcoin;
 
-// See http://gcc.gnu.org/wiki/Visibility
-
-// Generic helper definitions for shared library support
-#if defined _MSC_VER || defined __CYGWIN__
-    #define BC_HELPER_DLL_IMPORT __declspec(dllimport)
-    #define BC_HELPER_DLL_EXPORT __declspec(dllexport)
-    #define BC_HELPER_DLL_LOCAL
-#else
-    #if __GNUC__ >= 4
-        #define BC_HELPER_DLL_IMPORT __attribute__ ((visibility ("default")))
-        #define BC_HELPER_DLL_EXPORT __attribute__ ((visibility ("default")))
-        #define BC_HELPER_DLL_LOCAL  __attribute__ ((visibility ("internal")))
-    #else
-        #define BC_HELPER_DLL_IMPORT
-        #define BC_HELPER_DLL_EXPORT
-        #define BC_HELPER_DLL_LOCAL
-    #endif
-#endif
 
 // Now we use the generic helper definitions above to define BC_API
 // and BC_INTERNAL. BC_API is used for the public API symbols. It either DLL
 // imports or DLL exports (or does nothing for static build) BC_INTERNAL is
 // used for non-api symbols.
 
-#if defined BC_STATIC
-    #define BC_API
-    #define BC_INTERNAL
-#elif defined BC_DLL
-    #define BC_API      BC_HELPER_DLL_EXPORT
-    #define BC_INTERNAL BC_HELPER_DLL_LOCAL
-#else
-    #define BC_API      BC_HELPER_DLL_IMPORT
-    #define BC_INTERNAL BC_HELPER_DLL_LOCAL
-#endif
+	#define BC_API
+	#define BC_INTERNAL
 
 // Tag to deprecate functions and methods.
 // Gives a compiler warning when they are used.
 #if defined _MSC_VER || defined __CYGWIN__
-    #define BC_DEPRECATED __declspec(deprecated)
+	#define BC_DEPRECATED __declspec(deprecated)
 #else
-    #if __GNUC__ >= 4
-        #define BC_DEPRECATED __attribute__((deprecated))
-    #else
-        #define BC_DEPRECATED
-    #endif
+	#if __GNUC__ >= 4
+		#define BC_DEPRECATED __attribute__((deprecated))
+	#else
+		#define BC_DEPRECATED
+	#endif
 #endif
 
 // Log name.
 #define LOG_SYSTEM "system"
 
-// Avoid namespace conflict between boost::placeholders and std::placeholders. 
+// Avoid namespace conflict between boost::placeholders and std::placeholders.
 #define BOOST_BIND_NO_PLACEHOLDERS
 
 // Define so we can have better visibility of lcov exclusion ranges.
