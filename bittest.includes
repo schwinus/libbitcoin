@@ -1,0 +1,3 @@
+builds/msvc
+include/bitcoin/bitcoin
+src/math/external
