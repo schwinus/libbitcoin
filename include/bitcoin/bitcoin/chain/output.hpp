@@ -35,37 +35,125 @@ namespace chain {
 class BC_API output
 {
 public:
-    typedef std::vector<output> list;
+	typedef std::vector<output> list;
 
-    static output factory_from_data(const data_chunk& data);
-    static output factory_from_data(std::istream& stream);
-    static output factory_from_data(reader& source);
-    static uint64_t satoshi_fixed_size();
+	static output factory_from_data(const data_chunk& data)
+	{
+		output instance;
+		instance.from_data(data);
+		return instance;
+	}
 
-    bool from_data(const data_chunk& data);
-    bool from_data(std::istream& stream);
-    bool from_data(reader& source);
-    data_chunk to_data() const;
-    void to_data(std::ostream& stream) const;
-    void to_data(writer& sink) const;
-    std::string to_string(uint32_t flags) const;
-    bool is_valid() const;
-    void reset();
-    uint64_t serialized_size() const;
+	static output factory_from_data(std::istream& stream)
+	{
+		output instance;
+		instance.from_data(stream);
+		return instance;
+	}
 
-    uint64_t value;
-    chain::script script;
+	static output factory_from_data(reader& source)
+	{
+		output instance;
+		instance.from_data(source);
+		return instance;
+	}
+
+	// TODO: check
+	//static uint64_t satoshi_fixed_size();
+
+	bool from_data(const data_chunk& data)
+	{
+		data_source istream(data);
+		return from_data(istream);
+	}
+
+	bool from_data(std::istream& stream)
+	{
+		istream_reader source(stream);
+		return from_data(source);
+	}
+
+	bool from_data(reader& source)
+	{
+		reset();
+
+		value = source.read_8_bytes_little_endian();
+		auto result = static_cast<bool>(source);
+
+		if (result)
+			result = script.from_data(source, true,
+				script::parse_mode::raw_data_fallback);
+
+		if (!result)
+			reset();
+
+		return result;
+	}
+
+	data_chunk to_data() const
+	{
+		data_chunk data;
+		data_sink ostream(data);
+		to_data(ostream);
+		ostream.flush();
+		BITCOIN_ASSERT(data.size() == serialized_size());
+		return data;
+	}
+
+	void to_data(std::ostream& stream) const
+	{
+		ostream_writer sink(stream);
+		to_data(sink);
+	}
+
+	void to_data(writer& sink) const
+	{
+		sink.write_8_bytes_little_endian(value);
+		script.to_data(sink, true);
+	}
+
+	bool is_valid() const
+	{
+		return (value != 0) || script.is_valid();
+	}
+
+	void reset()
+	{
+		value = 0;
+		script.reset();
+	}
+
+	uint64_t serialized_size() const
+	{
+		return 8 + script.serialized_size(true);
+	}
+
+	std::string to_string(uint32_t flags) const
+	{
+		std::ostringstream ss;
+
+		ss << "\tvalue = " << value << "\n"
+			<< "\t" << script.to_string(flags) << "\n";
+
+		return ss.str();
+	}
+
+	uint64_t value;
+	chain::script script;
 };
 
 struct BC_API output_info
 {
-    typedef std::vector<output_info> list;
+	typedef std::vector<output_info> list;
 
-    output_point point;
-    uint64_t value;
+	output_point point;
+	uint64_t value;
 };
 
 } // namspace chain
 } // namspace libbitcoin
 
 #endif
+
+
+

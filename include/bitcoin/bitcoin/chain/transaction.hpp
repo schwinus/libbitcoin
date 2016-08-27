@@ -39,58 +39,340 @@ namespace chain {
 class BC_API transaction
 {
 public:
-    typedef std::vector<transaction> list;
-    typedef std::shared_ptr<transaction> ptr;
-    typedef std::vector<ptr> ptr_list;
-    typedef std::vector<size_t> indexes;
+	typedef std::vector<transaction> list;
+	typedef std::shared_ptr<transaction> ptr;
+	typedef std::vector<ptr> ptr_list;
+	typedef std::vector<size_t> indexes;
 
-    static transaction factory_from_data(const data_chunk& data);
-    static transaction factory_from_data(std::istream& stream);
-    static transaction factory_from_data(reader& source);
-    static uint64_t satoshi_fixed_size();
+	// TODO: remove
+//	static transaction transaction::factory_from_data(const data_chunk& data)
+//	{
+//		transaction instance;
+//		instance.from_data(data);
+//		return instance;
+//	}
 
-    transaction();
-    transaction(const transaction& other);
-    transaction(uint32_t version, uint32_t locktime, const input::list& inputs,
-        const output::list& outputs);
+//	static transaction transaction::factory_from_data(std::istream& stream)
+//	{
+//		transaction instance;
+//		instance.from_data(stream);
+//		return instance;
+//	}
 
-    transaction(transaction&& other);
-    transaction(uint32_t version, uint32_t locktime, input::list&& inputs,
-        output::list&& outputs);
+//	static transaction transaction::factory_from_data(reader& source)
+//	{
+//		transaction instance;
+//		instance.from_data(source);
+//		return instance;
+//	}
 
-    /// This class is move assignable [but not copy assignable].
-    transaction& operator=(transaction&& other);
+	static transaction transaction::factory_from_data(auto& source)
+	{
+		transaction instance;
+		instance.from_data(source);
+		return instance;
+	}
 
-    // TODO: eliminate blockchain transaction copies and then delete this.
-    transaction& operator=(const transaction& other) /*= delete*/;
+	// TODO: check
+	//static uint64_t satoshi_fixed_size();
 
-    bool from_data(const data_chunk& data);
-    bool from_data(std::istream& stream);
-    bool from_data(reader& source);
-    data_chunk to_data() const;
-    void to_data(std::ostream& stream) const;
-    void to_data(writer& sink) const;
-    std::string to_string(uint32_t flags) const;
-    bool is_valid() const;
-    void reset();
-    hash_digest hash() const;
+	// default constructors
+	transaction::transaction()
+		: version(0)
+		, locktime(0)
+		, hash_(nullptr)
+	{
+	}
 
-    // sighash_type is used by OP_CHECKSIG
-    hash_digest hash(uint32_t sighash_type) const;
-    bool is_coinbase() const;
-    bool is_final(uint64_t block_height, uint32_t block_time) const;
-    bool is_locktime_conflict() const;
-    uint64_t total_output_value() const;
-    uint64_t serialized_size() const;
+	transaction::transaction(const transaction& other)
+		: transaction(other.version, other.locktime, other.inputs, other.outputs)
+	{
+	}
 
-    uint32_t version;
-    uint32_t locktime;
-    input::list inputs;
-    output::list outputs;
+	transaction::transaction(uint32_t version, uint32_t locktime, const input::list& inputs, const output::list& outputs)
+		: version(version)
+		, locktime(locktime)
+		, inputs(inputs)
+		, outputs(outputs)
+		, hash_(nullptr)
+	{
+	}
+
+	transaction::transaction(transaction&& other)
+		: transaction(other.version, other.locktime, std::forward<input::list>(other.inputs), std::forward<output::list>(other.outputs))
+	{
+	}
+
+	transaction::transaction(uint32_t version, uint32_t locktime, input::list&& inputs, output::list&& outputs)
+	  : version(version)
+	  , locktime(locktime)
+	  , inputs(std::forward<input::list>(inputs))
+	  , outputs(std::forward<output::list>(outputs))
+	  , hash_(nullptr)
+	{
+	}
+
+	/// This class is move assignable [but not copy assignable].
+	transaction& transaction::operator=(transaction&& other)
+	{
+		version = other.version;
+		locktime = other.locktime;
+		inputs = std::move(other.inputs);
+		outputs = std::move(other.outputs);
+		return *this;
+	}
+
+	// TODO: eliminate blockchain transaction copies and then delete this.
+	//transaction& operator=(const transaction& other) /*= delete*/;
+	// TODO: eliminate blockchain transaction copies and then delete this.
+	transaction& transaction::operator=(const transaction& other)
+	{
+		version = other.version;
+		locktime = other.locktime;
+		inputs = other.inputs;
+		outputs = other.outputs;
+		return *this;
+	}
+
+	bool transaction::from_data(const data_chunk& data)
+	{
+		data_source istream(data);
+		return from_data(istream);
+	}
+
+	bool transaction::from_data(std::istream& stream)
+	{
+		istream_reader source(stream);
+		return from_data(source);
+	}
+
+	bool transaction::from_data(reader& source)
+	{
+		reset();
+		version = source.read_4_bytes_little_endian();
+		auto result = static_cast<bool>(source);
+
+		if (result)
+		{
+			const auto tx_in_count = source.read_variable_uint_little_endian();
+			result = source;
+
+			if (result)
+			{
+				inputs.resize(tx_in_count);
+
+				for (auto& input: inputs)
+				{
+					result = input.from_data(source);
+
+					if (!result)
+						break;
+				}
+			}
+		}
+
+		if (result)
+		{
+			const auto tx_out_count = source.read_variable_uint_little_endian();
+			result = source;
+
+			if (result)
+			{
+				outputs.resize(tx_out_count);
+
+				for (auto& output: outputs)
+				{
+					result = output.from_data(source);
+
+					if (!result)
+						break;
+				}
+			}
+		}
+
+		if (result)
+		{
+			locktime = source.read_4_bytes_little_endian();
+			result = source;
+		}
+
+		if (!result)
+			reset();
+
+		return result;
+	}
+
+	data_chunk transaction::to_data() const
+	{
+		data_chunk data;
+		data_sink ostream(data);
+		to_data(ostream);
+		ostream.flush();
+		BITCOIN_ASSERT(data.size() == serialized_size());
+
+		return data;
+	}
+
+	void transaction::to_data(std::ostream& stream) const
+	{
+		ostream_writer sink(stream);
+		to_data(sink);
+	}
+
+	void transaction::to_data(writer& sink) const
+	{
+		sink.write_4_bytes_little_endian(version);
+		sink.write_variable_uint_little_endian(inputs.size());
+
+		for (const auto& input: inputs)
+			input.to_data(sink);
+
+		sink.write_variable_uint_little_endian(outputs.size());
+
+		for (const auto& output: outputs)
+			output.to_data(sink);
+
+		sink.write_4_bytes_little_endian(locktime);
+	}
+
+	std::string transaction::to_string(uint32_t flags) const
+	{
+		std::ostringstream value;
+		value << "Transaction:\n"
+			<< "\tversion = " << version << "\n"
+			<< "\tlocktime = " << locktime << "\n"
+			<< "Inputs:\n";
+
+		for (const auto input: inputs)
+			value << input.to_string(flags);
+
+		value << "Outputs:\n";
+		for (const auto output: outputs)
+			value << output.to_string(flags);
+
+		value << "\n";
+		return value.str();
+	}
+
+	bool transaction::is_valid() const
+	{
+		return (version != 0) || (locktime != 0) || !inputs.empty() ||
+			!outputs.empty();
+	}
+
+	void transaction::reset()
+	{
+		version = 0;
+		locktime = 0;
+		inputs.clear();
+		inputs.shrink_to_fit();
+		outputs.clear();
+		outputs.shrink_to_fit();
+
+		mutex_.lock();
+		hash_.reset();
+		mutex_.unlock();
+	}
+
+	hash_digest transaction::hash() const
+	{
+		///////////////////////////////////////////////////////////////////////////
+		// Critical Section
+		mutex_.lock_upgrade();
+
+		if (!hash_)
+		{
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			mutex_.unlock_upgrade_and_lock();
+			hash_.reset(new hash_digest(bitcoin_hash(to_data())));
+			mutex_.unlock_and_lock_upgrade();
+			//---------------------------------------------------------------------
+		}
+
+		hash_digest hash = *hash_;
+		mutex_.unlock_upgrade();
+		///////////////////////////////////////////////////////////////////////////
+
+		return hash;
+	}
+
+	// sighash_type is used by OP_CHECKSIG
+	hash_digest transaction::hash(uint32_t sighash_type) const
+	{
+		auto serialized = to_data();
+		extend_data(serialized, to_little_endian(sighash_type));
+		return bitcoin_hash(serialized);
+	}
+
+	bool transaction::is_coinbase() const
+	{
+		return (inputs.size() == 1) && inputs[0].previous_output.is_null();
+	}
+
+	bool transaction::is_final(uint64_t block_height, uint32_t block_time) const
+	{
+		if (locktime == 0)
+			return true;
+
+		auto max_locktime = block_time;
+
+		if (locktime < locktime_threshold)
+			max_locktime = static_cast<uint32_t>(block_height);
+
+		if (locktime < max_locktime)
+			return true;
+
+		for (const auto& tx_input: inputs)
+			if (!tx_input.is_final())
+				return false;
+
+		return true;
+	}
+
+	bool transaction::is_locktime_conflict() const
+	{
+		auto locktime_set = locktime != 0;
+
+		if (locktime_set)
+			for (const auto& input: inputs)
+				if (input.sequence < max_input_sequence)
+					return false;
+
+		return locktime_set;
+	}
+
+	uint64_t transaction::total_output_value() const
+	{
+		const auto value = [](uint64_t total, const output& output)
+		{
+			return total + output.value;
+		};
+
+		return std::accumulate(outputs.begin(), outputs.end(), uint64_t(0), value);
+	}
+
+	uint64_t transaction::serialized_size() const
+	{
+		uint64_t tx_size = 8;
+		tx_size += variable_uint_size(inputs.size());
+		for (const auto& input: inputs)
+			tx_size += input.serialized_size();
+
+		tx_size += variable_uint_size(outputs.size());
+		for (const auto& output: outputs)
+			tx_size += output.serialized_size();
+
+		return tx_size;
+	}
+
+	uint32_t version;
+	uint32_t locktime;
+	input::list inputs;
+	output::list outputs;
 
 private:
-    mutable upgrade_mutex mutex_;
-    mutable std::shared_ptr<hash_digest> hash_;
+	mutable upgrade_mutex mutex_;
+	mutable std::shared_ptr<hash_digest> hash_;
 };
 
 } // namspace chain

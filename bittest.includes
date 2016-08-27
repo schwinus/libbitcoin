@@ -1,3 +1,4 @@
 builds/msvc
 include/bitcoin/bitcoin
 src/math/external
+src/chain/script

@@ -25,18 +25,42 @@
 namespace libbitcoin {
 namespace chain {
 
+// TODO: hide this class from api
 class conditional_stack
 {
 public:
-    bool closed() const;
-    bool succeeded() const;
-    void clear();
-    void open(bool value);
-    void else_();
-    void close();
+	bool closed() const
+	{
+		return stack_.empty();
+	}
+
+	bool succeeded() const
+	{
+		return std::count(stack_.begin(), stack_.end(), false) == 0;
+	}
+
+	void clear()
+	{
+		stack_.clear();
+	}
+
+	void open(bool value)
+	{
+		stack_.push_back(value);
+	}
+
+	void else_()
+	{
+		stack_.back() = !stack_.back();
+	}
+
+	void close()
+	{
+		stack_.pop_back();
+	}
 
 private:
-    std::vector<bool> stack_;
+	std::vector<bool> stack_;
 };
 
 } // namspace chain

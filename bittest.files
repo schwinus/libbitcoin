@@ -443,3 +443,5 @@ test/wallet/stealth_address.cpp
 test/wallet/uri.cpp
 test/wallet/uri_reader.cpp
 test/main.cpp
+src/chain/script/script.cpp
+src/chain/script/script.cpp

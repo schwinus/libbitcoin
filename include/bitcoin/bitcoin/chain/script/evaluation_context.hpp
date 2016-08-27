@@ -17,42 +17,40 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include "conditional_stack.hpp"
+#ifndef LIBBITCOIN_CHAIN_EVALUATION_CONTEXT_HPP
+#define LIBBITCOIN_CHAIN_EVALUATION_CONTEXT_HPP
 
 #include <algorithm>
+#include <cstdint>
+#include <bitcoin/bitcoin/chain/script/operation.hpp>
+#include <bitcoin/bitcoin/define.hpp>
+#include <bitcoin/bitcoin/utility/data.hpp>
+#include "conditional_stack.hpp"
 
 namespace libbitcoin {
 namespace chain {
 
-bool conditional_stack::closed() const
+// TODO: hide this class from api
+class evaluation_context
 {
-    return stack_.empty();
-}
+public:
+	data_chunk pop_stack()
+	{
+		const auto value = stack.back();
+		stack.pop_back();
+		return value;
+	}
 
-bool conditional_stack::succeeded() const
-{
-    return std::count(stack_.begin(), stack_.end(), false) == 0;
-}
 
-void conditional_stack::clear()
-{
-    stack_.clear();
-}
-
-void conditional_stack::open(bool value)
-{
-    stack_.push_back(value);
-}
-
-void conditional_stack::else_()
-{
-    stack_.back() = !stack_.back();
-}
-
-void conditional_stack::close()
-{
-    stack_.pop_back();
-}
+	operation::stack::const_iterator code_begin;
+	uint64_t operation_counter;
+	data_stack stack;
+	data_stack alternate;
+	conditional_stack conditional;
+	uint32_t flags;
+};
 
 } // namspace chain
 } // namspace libbitcoin
+
+#endif
